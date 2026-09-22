@@ -324,6 +324,16 @@ export const usePlanSave = () =>
     invalidate: ["plans", ...TENANT_KEYS],
   });
 
+export const usePlanDelete = () =>
+  useInvokeMutation<{ plan_id: string }, { deleted: boolean; plan: Plan }>("billing_ops_plan_delete", {
+    invalidate: ["plans", ...TENANT_KEYS],
+  });
+
+export const usePackDelete = () =>
+  useInvokeMutation<{ pack_id: string }, { deleted: boolean; pack: Pack }>("billing_ops_token_pack_delete", {
+    invalidate: ["packs"],
+  });
+
 export const usePackSave = () =>
   useInvokeMutation<{ pack: Partial<Pack> }, { pack: Pack; created: boolean }>("billing_ops_token_pack_save", {
     invalidate: ["packs"],

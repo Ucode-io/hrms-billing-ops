@@ -79,6 +79,8 @@ export const EVENT: Record<string, string> = {
   plan_updated: "Изменён план",
   plan_activated: "План включён",
   plan_deactivated: "План выключен",
+  plan_deleted: "Удалён план",
+  token_pack_deleted: "Удалён пакет",
   token_pack_created: "Создан пакет",
   token_pack_updated: "Изменён пакет",
 };

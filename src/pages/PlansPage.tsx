@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Calculator, Plus } from "lucide-react";
+import { Calculator, Pencil, Plus, Trash2 } from "lucide-react";
 import {
+  usePackDelete,
   usePackSave,
   usePacks,
+  usePlanDelete,
   usePlanSave,
   usePlans,
   useRecomputeTokenLimits,
@@ -82,7 +84,12 @@ export default function PlansPage() {
             empty={(plans.data ?? []).length === 0}
           >
             {(plans.data ?? []).map((plan) => (
-              <tr key={plan.id} className="hover:bg-slate-50">
+              <tr
+                key={plan.id}
+                onClick={() => setPlanDraft(plan)}
+                className="cursor-pointer hover:bg-slate-50"
+                title="Открыть для изменения"
+              >
                 <Td className="font-medium text-slate-900">{plan.title}</Td>
                 <Td className="text-slate-400">{plan.code}</Td>
                 <Td className="tnum">{usd(plan.price_usd)}</Td>
@@ -94,17 +101,18 @@ export default function PlansPage() {
                   <Badge tone={plan.is_active ? "green" : "slate"}>{plan.is_active ? "В каталоге" : "Скрыт"}</Badge>
                 </Td>
                 <Td>
-                  <button onClick={() => setPlanDraft(plan)} className="text-xs text-slate-500 hover:text-slate-900">
-                    Изменить
-                  </button>
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                    <Pencil className="h-3.5 w-3.5" /> Изменить
+                  </span>
                 </Td>
               </tr>
             ))}
           </Table>
         )}
         <p className="mt-3 text-xs text-slate-400">
-          Новая цена действует со следующего счёта: выставленные счета хранят свой снимок цен. План, на котором есть
-          компании, удалить нельзя — его можно скрыть из каталога.
+          Нажмите на строку, чтобы изменить план. Новая цена действует со следующего счёта: выставленные счета хранят
+          свой снимок цен. Удалить можно только план, которым ещё никто не пользовался; если компании на нём уже есть,
+          снимите «в каталоге» — он исчезнет из выбора, а действующие подписки не изменятся.
         </p>
       </Card>
 
@@ -122,7 +130,12 @@ export default function PlansPage() {
         ) : (
           <Table head={["Название", "Код", "Токенов", "Цена", "Статус", ""]} empty={(packs.data ?? []).length === 0}>
             {(packs.data ?? []).map((pack) => (
-              <tr key={pack.id} className="hover:bg-slate-50">
+              <tr
+                key={pack.id}
+                onClick={() => setPackDraft(pack)}
+                className="cursor-pointer hover:bg-slate-50"
+                title="Открыть для изменения"
+              >
                 <Td className="font-medium text-slate-900">{pack.title}</Td>
                 <Td className="text-slate-400">{pack.code}</Td>
                 <Td className="tnum text-slate-600">{tokens(pack.tokens)}</Td>
@@ -131,9 +144,9 @@ export default function PlansPage() {
                   <Badge tone={pack.is_active ? "green" : "slate"}>{pack.is_active ? "В каталоге" : "Скрыт"}</Badge>
                 </Td>
                 <Td>
-                  <button onClick={() => setPackDraft(pack)} className="text-xs text-slate-500 hover:text-slate-900">
-                    Изменить
-                  </button>
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                    <Pencil className="h-3.5 w-3.5" /> Изменить
+                  </span>
                 </Td>
               </tr>
             ))}
@@ -150,8 +163,10 @@ export default function PlansPage() {
 function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => void }) {
   const toast = useToast();
   const save = usePlanSave();
+  const remove = usePlanDelete();
   const settings = useSettings();
   const [form, setForm] = useState(draft);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const patch = (next: Partial<Plan>) => setForm((prev) => ({ ...prev, ...next }));
 
@@ -172,6 +187,34 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
       width="max-w-xl"
       footer={
         <>
+          {draft.id ? (
+            <Button
+              variant="danger"
+              className="mr-auto"
+              loading={remove.isPending}
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true);
+                  return;
+                }
+                remove.mutate(
+                  { plan_id: draft.id! },
+                  {
+                    onSuccess: () => {
+                      toast("ok", "План удалён");
+                      onClose();
+                    },
+                    onError: (e) => {
+                      setConfirmDelete(false);
+                      toast("error", errorText(e));
+                    },
+                  }
+                );
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> {confirmDelete ? "Точно удалить?" : "Удалить"}
+            </Button>
+          ) : null}
           <Button onClick={onClose}>Отмена</Button>
           <Button
             variant="primary"
@@ -268,7 +311,9 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
 function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => void }) {
   const toast = useToast();
   const save = usePackSave();
+  const remove = usePackDelete();
   const [form, setForm] = useState(draft);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const patch = (next: Partial<Pack>) => setForm((prev) => ({ ...prev, ...next }));
 
   return (
@@ -278,6 +323,34 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
       onClose={onClose}
       footer={
         <>
+          {draft.id ? (
+            <Button
+              variant="danger"
+              className="mr-auto"
+              loading={remove.isPending}
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true);
+                  return;
+                }
+                remove.mutate(
+                  { pack_id: draft.id! },
+                  {
+                    onSuccess: () => {
+                      toast("ok", "Пакет удалён");
+                      onClose();
+                    },
+                    onError: (e) => {
+                      setConfirmDelete(false);
+                      toast("error", errorText(e));
+                    },
+                  }
+                );
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> {confirmDelete ? "Точно удалить?" : "Удалить"}
+            </Button>
+          ) : null}
           <Button onClick={onClose}>Отмена</Button>
           <Button
             variant="primary"
