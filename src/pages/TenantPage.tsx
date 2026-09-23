@@ -170,12 +170,18 @@ export default function TenantPage() {
         </Card>
         <Card>
           <Stat
-            label="AI-токены"
+            label="AI за период"
             value={
-              ai.limit === null ? "Без лимита" : `${tokens(ai.used)} из ${tokens(ai.limit + ai.purchased)}`
+              ai.limit_usd === null
+                ? "Без лимита"
+                : `${usd(ai.spent_usd)} из ${usd(ai.limit_usd + ai.purchased_usd)}`
             }
+            tone={ai.limit_usd !== null && ai.spent_usd > ai.limit_usd + ai.purchased_usd ? "text-rose-700" : ""}
           />
-          {ai.purchased > 0 ? <div className="mt-1 text-xs text-slate-500">Куплено: {tokens(ai.purchased)}</div> : null}
+          <div className="mt-1 text-xs text-slate-500">
+            {ai.purchased_usd > 0 ? `Докуплено: ${usd(ai.purchased_usd)} · ` : ""}
+            израсходовано {tokens(ai.tokens_used)} токенов
+          </div>
         </Card>
       </div>
 
@@ -584,13 +590,13 @@ function AdjustmentModal({ detail, onClose }: { detail: TenantDetail; onClose: (
 function AiGrantModal({ detail, onClose }: { detail: TenantDetail; onClose: () => void }) {
   const toast = useToast();
   const grant = useAiGrant();
-  const [value, setValue] = useState("1000000");
+  const [value, setValue] = useState("5");
   const [comment, setComment] = useState("");
 
   return (
     <Modal
       open
-      title="Начислить AI-токены"
+      title="Начислить лимит AI"
       onClose={onClose}
       footer={
         <>
@@ -598,13 +604,13 @@ function AiGrantModal({ detail, onClose }: { detail: TenantDetail; onClose: () =
           <Button
             variant="primary"
             loading={grant.isPending}
-            disabled={toInt(value) <= 0}
+            disabled={!(Number(value) > 0)}
             onClick={() =>
               grant.mutate(
-                { tenant_id: detail.company.id, tokens: toInt(value), comment: comment.trim() || undefined },
+                { tenant_id: detail.company.id, usd: Number(value), comment: comment.trim() || undefined },
                 {
                   onSuccess: () => {
-                    toast("ok", "Токены начислены");
+                    toast("ok", "Лимит AI начислен");
                     onClose();
                   },
                   onError: (e) => toast("error", errorText(e)),
@@ -618,10 +624,10 @@ function AiGrantModal({ detail, onClose }: { detail: TenantDetail; onClose: () =
       }
     >
       <p className="text-sm text-slate-500">
-        Начисленные токены не сгорают при продлении — расходуются после месячного лимита плана.
+        Начисленный лимит не сгорает при продлении — расходуется после месячного лимита плана.
       </p>
-      <Field label="Токенов">
-        <Input inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className="tnum" />
+      <Field label="Сумма, $" hint="Доллары себестоимости AI, а не сумма к оплате.">
+        <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} className="tnum" />
       </Field>
       <Field label="Комментарий">
         <Input value={comment} onChange={(e) => setComment(e.target.value)} />

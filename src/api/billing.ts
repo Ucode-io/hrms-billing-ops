@@ -10,6 +10,7 @@ export interface Plan {
   price_usd: number;
   included_seats: number;
   overage_price_usd: number;
+  included_ai_usd: number;
   included_tokens: number;
   ai_enabled: boolean;
   is_active: boolean;
@@ -21,6 +22,7 @@ export interface Pack {
   id: string;
   code: string;
   title: string;
+  grants_usd: number;
   tokens: number;
   price_usd: number;
   is_active: boolean;
@@ -40,8 +42,8 @@ export interface TenantRow {
   next_renewal_date: string | null;
   grace_until: string | null;
   autopay_enabled: boolean;
-  tokens_used_period: number;
-  tokens_purchased: number;
+  ai_spent_usd: number;
+  ai_purchased_usd: number;
   last_error: string | null;
 }
 
@@ -59,8 +61,9 @@ export interface Subscription {
   pending_plan_id: string | null;
   autopay_enabled: boolean;
   default_card_id: string | null;
+  ai_spent_usd: number;
+  ai_purchased_usd: number;
   tokens_used_period: number;
-  tokens_purchased: number;
   last_error: string | null;
 }
 
@@ -129,13 +132,16 @@ export interface EventRow {
   created_at: string;
 }
 
+/** Лимит AI считается в долларах себестоимости; токены — справочный факт. */
 export interface AiQuota {
   allowed: boolean;
   reason: string | null;
-  limit: number | null;
-  used: number;
-  purchased: number;
-  remaining: number | null;
+  limit_usd: number | null;
+  spent_usd: number;
+  purchased_usd: number;
+  remaining_usd: number | null;
+  used_share: number | null;
+  tokens_used: number;
   period_end: string | null;
 }
 
@@ -314,7 +320,7 @@ export const useRunTick = () =>
   useInvokeMutation<{ tenant_id?: string }, TickSummary>("billing_ops_run_tick", { invalidate: TENANT_KEYS });
 
 export const useAiGrant = () =>
-  useInvokeMutation<{ tenant_id: string; tokens: number; comment?: string }, { subscription: Subscription }>(
+  useInvokeMutation<{ tenant_id: string; usd: number; comment?: string }, { subscription: Subscription }>(
     "billing_ops_ai_grant",
     { withRequestId: true, invalidate: TENANT_KEYS }
   );

@@ -20,13 +20,13 @@ const EMPTY_PLAN: Partial<Plan> = {
   price_usd: 0,
   included_seats: 0,
   overage_price_usd: 0,
-  included_tokens: 0,
+  included_ai_usd: 0,
   ai_enabled: true,
   is_active: true,
   sort_order: 0,
 };
 
-const EMPTY_PACK: Partial<Pack> = { code: "", title: "", tokens: 1_000_000, price_usd: 0, is_active: true, sort_order: 0 };
+const EMPTY_PACK: Partial<Pack> = { code: "", title: "", grants_usd: 5, price_usd: 0, is_active: true, sort_order: 0 };
 
 const num = (value: string): number => Number(String(value).replace(",", ".")) || 0;
 
@@ -46,18 +46,18 @@ export default function PlansPage() {
         <h1 className="mr-auto text-lg font-semibold text-slate-900">Планы и пакеты</h1>
         <Button
           loading={recompute.isPending}
-          title="Проставить лимит токенов по формуле: доля от цены плана, делённая на стоимость токенов"
+          title="Проставить лимит AI по формуле: доля от цены плана"
           onClick={() =>
             recompute.mutate(
               {},
               {
-                onSuccess: () => toast("ok", "Лимиты токенов пересчитаны по формуле"),
+                onSuccess: () => toast("ok", "Лимиты AI пересчитаны по формуле"),
                 onError: (e) => toast("error", errorText(e)),
               }
             )
           }
         >
-          <Calculator className="h-4 w-4" /> Пересчитать лимиты токенов
+          <Calculator className="h-4 w-4" /> Пересчитать лимиты AI
         </Button>
         <Button variant="primary" onClick={() => setPlanDraft({ ...EMPTY_PLAN })}>
           <Plus className="h-4 w-4" /> Новый план
@@ -69,8 +69,7 @@ export default function PlansPage() {
         action={
           settings.data ? (
             <span className="text-xs text-slate-400">
-              формула токенов: {Math.round(settings.data.ai_included_share * 100)}% цены ÷ $
-              {settings.data.ai_blended_usd_per_mtok} за млн
+              лимит AI по формуле: {Math.round(settings.data.ai_included_share * 100)}% цены плана
             </span>
           ) : null
         }
@@ -80,7 +79,7 @@ export default function PlansPage() {
           <Loading />
         ) : (
           <Table
-            head={["Название", "Код", "Цена", "Мест", "Сверх лимита", "AI-токены", "Компаний", "Статус", ""]}
+            head={["Название", "Код", "Цена", "Мест", "Сверх лимита", "AI в месяц", "Компаний", "Статус", ""]}
             empty={(plans.data ?? []).length === 0}
           >
             {(plans.data ?? []).map((plan) => (
@@ -95,7 +94,16 @@ export default function PlansPage() {
                 <Td className="tnum">{usd(plan.price_usd)}</Td>
                 <Td className="tnum text-slate-600">{plan.included_seats}</Td>
                 <Td className="tnum text-slate-600">{usd(plan.overage_price_usd)} / место</Td>
-                <Td className="tnum text-slate-600">{plan.ai_enabled ? tokens(plan.included_tokens) : "выключен"}</Td>
+                <Td className="tnum text-slate-600">
+                  {plan.ai_enabled ? (
+                    <>
+                      {usd(plan.included_ai_usd)}
+                      <div className="text-xs text-slate-400">≈ {tokens(plan.included_tokens)} токенов</div>
+                    </>
+                  ) : (
+                    "выключен"
+                  )}
+                </Td>
                 <Td className="tnum text-slate-600">{plan.subscriptions ?? 0}</Td>
                 <Td>
                   <Badge tone={plan.is_active ? "green" : "slate"}>{plan.is_active ? "В каталоге" : "Скрыт"}</Badge>
@@ -128,7 +136,7 @@ export default function PlansPage() {
         {packs.isLoading ? (
           <Loading />
         ) : (
-          <Table head={["Название", "Код", "Токенов", "Цена", "Статус", ""]} empty={(packs.data ?? []).length === 0}>
+          <Table head={["Название", "Код", "Даёт AI на", "Цена", "Статус", ""]} empty={(packs.data ?? []).length === 0}>
             {(packs.data ?? []).map((pack) => (
               <tr
                 key={pack.id}
@@ -138,7 +146,7 @@ export default function PlansPage() {
               >
                 <Td className="font-medium text-slate-900">{pack.title}</Td>
                 <Td className="text-slate-400">{pack.code}</Td>
-                <Td className="tnum text-slate-600">{tokens(pack.tokens)}</Td>
+                <Td className="tnum text-slate-600">{usd(pack.grants_usd)}</Td>
                 <Td className="tnum">{usd(pack.price_usd)}</Td>
                 <Td>
                   <Badge tone={pack.is_active ? "green" : "slate"}>{pack.is_active ? "В каталоге" : "Скрыт"}</Badge>
@@ -170,13 +178,16 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
 
   const patch = (next: Partial<Plan>) => setForm((prev) => ({ ...prev, ...next }));
 
-  // Подсказка «сколько токенов получится по формуле» — оператор может взять её
-  // как есть или поставить своё число.
-  const suggested =
+  // Подсказка «сколько выходит по формуле» — оператор может взять её как есть
+  // или поставить своё число. Рядом — порядок величины в токенах, чтобы было
+  // видно, много это или мало.
+  const suggestedUsd =
     settings.data && form.price_usd
-      ? Math.floor(
-          (settings.data.ai_included_share * Number(form.price_usd)) / settings.data.ai_blended_usd_per_mtok * 1_000_000
-        )
+      ? Math.round(settings.data.ai_included_share * Number(form.price_usd) * 100) / 100
+      : null;
+  const asTokens =
+    settings.data && form.included_ai_usd
+      ? Math.floor((Number(form.included_ai_usd) / settings.data.ai_blended_usd_per_mtok) * 1_000_000)
       : null;
 
   return (
@@ -270,14 +281,21 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
           />
         </Field>
         <Field
-          label="AI-токенов в месяц"
-          hint={suggested !== null ? `По формуле: ${tokens(suggested)}` : undefined}
+          label="AI в месяц, $"
+          hint={
+            [
+              suggestedUsd !== null ? `По формуле: ${usd(suggestedUsd)}` : null,
+              asTokens !== null ? `≈ ${tokens(asTokens)} токенов` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
         >
           <Input
-            inputMode="numeric"
+            inputMode="decimal"
             className="tnum"
-            value={String(form.included_tokens ?? 0)}
-            onChange={(e) => patch({ included_tokens: Math.round(num(e.target.value)) })}
+            value={String(form.included_ai_usd ?? 0)}
+            onChange={(e) => patch({ included_ai_usd: num(e.target.value) })}
           />
         </Field>
         <Field label="AI-помощник">
@@ -355,7 +373,7 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
           <Button
             variant="primary"
             loading={save.isPending}
-            disabled={!form.code?.trim() || !form.title?.trim() || !form.tokens}
+            disabled={!form.code?.trim() || !form.title?.trim() || !form.grants_usd}
             onClick={() =>
               save.mutate(
                 { pack: form },
@@ -381,12 +399,12 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
         <Field label="Код">
           <Input value={form.code ?? ""} onChange={(e) => patch({ code: e.target.value })} disabled={Boolean(draft.id)} />
         </Field>
-        <Field label="Токенов">
+        <Field label="Даёт AI на, $" hint="Сколько долларов лимита получит компания.">
           <Input
-            inputMode="numeric"
+            inputMode="decimal"
             className="tnum"
-            value={String(form.tokens ?? 0)}
-            onChange={(e) => patch({ tokens: Math.round(num(e.target.value)) })}
+            value={String(form.grants_usd ?? 0)}
+            onChange={(e) => patch({ grants_usd: num(e.target.value) })}
           />
         </Field>
         <Field label="Цена, $">
@@ -413,7 +431,7 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
         </Field>
       </div>
       <p className="text-xs text-slate-400">
-        Купленные токены не сгорают при продлении: они тратятся после того, как закончился месячный лимит плана.
+        Купленный лимит не сгорает при продлении: он тратится после того, как закончился месячный лимит плана.
       </p>
     </Modal>
   );
