@@ -86,6 +86,46 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${inputClass} ${props.className ?? ""}`} />;
 }
 
+const parseNumber = (text: string): number => Number(text.replace(",", ".")) || 0;
+
+/**
+ * Поле для денег и количеств. Держит набранный текст отдельно от числа:
+ * если перерисовывать из числа, «0,» и «0.0» схлопываются в «0» на полпути,
+ * и $0,05 или $11,50 не ввести вовсе. Число наружу отдаётся на каждый ввод;
+ * текст пересинхронизируется, только когда число поменяли снаружи.
+ */
+export function NumberInput({
+  value,
+  onValueChange,
+  integer = false,
+  ...rest
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> & {
+  value: number | null | undefined;
+  onValueChange: (value: number) => void;
+  integer?: boolean;
+}) {
+  const [text, setText] = useState(() => String(value ?? 0));
+
+  useEffect(() => {
+    if (parseNumber(text) !== Number(value ?? 0)) setText(String(value ?? 0));
+    // text намеренно не в зависимостях: реагируем только на внешнее значение.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <Input
+      {...rest}
+      inputMode={integer ? "numeric" : "decimal"}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        const parsed = parseNumber(e.target.value);
+        onValueChange(integer ? Math.round(parsed) : parsed);
+      }}
+    />
+  );
+}
+
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`${inputClass} ${props.className ?? ""}`} />;
 }

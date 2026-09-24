@@ -11,7 +11,7 @@ import {
   useSettings,
 } from "../api/billing";
 import type { Pack, Plan } from "../api/billing";
-import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Modal, Select, Table, Td, errorText, useToast } from "../components/ui";
+import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Modal, NumberInput, Select, Table, Td, errorText, useToast } from "../components/ui";
 import { tokens, usd } from "../lib/format";
 
 const EMPTY_PLAN: Partial<Plan> = {
@@ -27,8 +27,6 @@ const EMPTY_PLAN: Partial<Plan> = {
 };
 
 const EMPTY_PACK: Partial<Pack> = { code: "", title: "", grants_usd: 5, price_usd: 0, is_active: true, sort_order: 0 };
-
-const num = (value: string): number => Number(String(value).replace(",", ".")) || 0;
 
 export default function PlansPage() {
   const plans = usePlans();
@@ -257,27 +255,25 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
           <Input value={form.code ?? ""} onChange={(e) => patch({ code: e.target.value })} disabled={Boolean(draft.id)} />
         </Field>
         <Field label="Цена в месяц, $">
-          <Input
-            inputMode="decimal"
+          <NumberInput
             className="tnum"
-            value={String(form.price_usd ?? 0)}
-            onChange={(e) => patch({ price_usd: num(e.target.value) })}
+            value={form.price_usd}
+            onValueChange={(v) => patch({ price_usd: v })}
           />
         </Field>
         <Field label="Включено сотрудников">
-          <Input
-            inputMode="numeric"
+          <NumberInput
+            integer
             className="tnum"
-            value={String(form.included_seats ?? 0)}
-            onChange={(e) => patch({ included_seats: Math.round(num(e.target.value)) })}
+            value={form.included_seats}
+            onValueChange={(v) => patch({ included_seats: v })}
           />
         </Field>
         <Field label="Сверхлимитное место, $ / мес" hint="Списывается по дням за прошедший месяц.">
-          <Input
-            inputMode="decimal"
+          <NumberInput
             className="tnum"
-            value={String(form.overage_price_usd ?? 0)}
-            onChange={(e) => patch({ overage_price_usd: num(e.target.value) })}
+            value={form.overage_price_usd}
+            onValueChange={(v) => patch({ overage_price_usd: v })}
           />
         </Field>
         <Field
@@ -291,11 +287,10 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
               .join(" · ") || undefined
           }
         >
-          <Input
-            inputMode="decimal"
+          <NumberInput
             className="tnum"
-            value={String(form.included_ai_usd ?? 0)}
-            onChange={(e) => patch({ included_ai_usd: num(e.target.value) })}
+            value={form.included_ai_usd}
+            onValueChange={(v) => patch({ included_ai_usd: v })}
           />
         </Field>
         <Field label="AI-помощник">
@@ -314,11 +309,11 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
           </Select>
         </Field>
         <Field label="Порядок в списке">
-          <Input
-            inputMode="numeric"
+          <NumberInput
+            integer
             className="tnum"
-            value={String(form.sort_order ?? 0)}
-            onChange={(e) => patch({ sort_order: Math.round(num(e.target.value)) })}
+            value={form.sort_order}
+            onValueChange={(v) => patch({ sort_order: v })}
           />
         </Field>
       </div>
@@ -400,19 +395,17 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
           <Input value={form.code ?? ""} onChange={(e) => patch({ code: e.target.value })} disabled={Boolean(draft.id)} />
         </Field>
         <Field label="Даёт AI на, $" hint="Сколько долларов лимита получит компания.">
-          <Input
-            inputMode="decimal"
+          <NumberInput
             className="tnum"
-            value={String(form.grants_usd ?? 0)}
-            onChange={(e) => patch({ grants_usd: num(e.target.value) })}
+            value={form.grants_usd}
+            onValueChange={(v) => patch({ grants_usd: v })}
           />
         </Field>
         <Field label="Цена, $">
-          <Input
-            inputMode="decimal"
+          <NumberInput
             className="tnum"
-            value={String(form.price_usd ?? 0)}
-            onChange={(e) => patch({ price_usd: num(e.target.value) })}
+            value={form.price_usd}
+            onValueChange={(v) => patch({ price_usd: v })}
           />
         </Field>
         <Field label="В каталоге">
@@ -422,11 +415,11 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
           </Select>
         </Field>
         <Field label="Порядок в списке">
-          <Input
-            inputMode="numeric"
+          <NumberInput
+            integer
             className="tnum"
-            value={String(form.sort_order ?? 0)}
-            onChange={(e) => patch({ sort_order: Math.round(num(e.target.value)) })}
+            value={form.sort_order}
+            onValueChange={(v) => patch({ sort_order: v })}
           />
         </Field>
       </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { useSettings, useSettingsSave } from "../api/billing";
 import type { Requisites, Settings } from "../api/billing";
-import { Button, Card, ErrorBox, Field, Input, Loading, Textarea, errorText, useToast } from "../components/ui";
+import { Button, Card, ErrorBox, Field, Input, Loading, NumberInput, Textarea, errorText, useToast } from "../components/ui";
 
 const REQUISITE_FIELDS: { key: keyof Requisites; label: string; hint?: string }[] = [
   { key: "company_name", label: "Наименование" },
@@ -15,8 +15,6 @@ const REQUISITE_FIELDS: { key: keyof Requisites; label: string; hint?: string }[
   { key: "phone", label: "Телефон" },
   { key: "email", label: "E-mail" },
 ];
-
-const num = (value: string): number => Number(String(value).replace(",", ".")) || 0;
 
 export default function SettingsPage() {
   const { data, isLoading, error } = useSettings();
@@ -106,11 +104,11 @@ export default function SettingsPage() {
             label="Платных дней отсрочки"
             hint="Сколько дней после неудачного списания компания работает как обычно. Каждый такой день списывается по дневной ставке и уводит баланс в минус; после них — только просмотр."
           >
-            <Input
-              inputMode="numeric"
+            <NumberInput
+              integer
               className="tnum w-32"
-              value={String(form.grace_days)}
-              onChange={(e) => setForm({ ...form, grace_days: Math.round(num(e.target.value)) })}
+              value={form.grace_days}
+              onValueChange={(v) => setForm({ ...form, grace_days: v })}
             />
           </Field>
         </Card>
@@ -118,19 +116,17 @@ export default function SettingsPage() {
         <Card title="AI-токены">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Доля цены плана на AI" hint="0.10 = 10% цены плана уходит на токены.">
-              <Input
-                inputMode="decimal"
+              <NumberInput
                 className="tnum"
-                value={String(form.ai_included_share)}
-                onChange={(e) => setForm({ ...form, ai_included_share: num(e.target.value) })}
+                value={form.ai_included_share}
+                onValueChange={(v) => setForm({ ...form, ai_included_share: v })}
               />
             </Field>
             <Field label="Средняя цена, $ за млн токенов" hint="Смесь входящих и исходящих токенов модели.">
-              <Input
-                inputMode="decimal"
+              <NumberInput
                 className="tnum"
-                value={String(form.ai_blended_usd_per_mtok)}
-                onChange={(e) => setForm({ ...form, ai_blended_usd_per_mtok: num(e.target.value) })}
+                value={form.ai_blended_usd_per_mtok}
+                onValueChange={(v) => setForm({ ...form, ai_blended_usd_per_mtok: v })}
               />
             </Field>
           </div>
