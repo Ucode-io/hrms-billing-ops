@@ -68,5 +68,9 @@ export async function invoke<T>(method: string, data: Record<string, unknown> = 
   return result as T;
 }
 
+/** Сервер отказал по правам (метод бросает badRequest('Forbidden')). */
+export const isForbidden = (error: unknown): boolean =>
+  error instanceof Error && error.message === "Forbidden";
+
 /** Идемпотентный ключ денежной операции: защита от двойного клика и ретрая. */
 export const newRequestId = (): string => crypto.randomUUID();
