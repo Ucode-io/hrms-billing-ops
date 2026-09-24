@@ -171,15 +171,19 @@ export default function TenantPage() {
         <Card>
           <Stat
             label="AI за период"
+            // spent_usd — расход против лимита плана; докупленное лежит отдельно
+            // и уменьшается по мере трат (purchased_usd — это уже остаток).
+            // Складывать их в «из» нельзя: знаменатель поедет вниз при каждом вопросе.
             value={
               ai.limit_usd === null
                 ? "Без лимита"
-                : `${usd(ai.spent_usd)} из ${usd(ai.limit_usd + ai.purchased_usd)}`
+                : `${usd(ai.spent_usd)} из ${usd(ai.limit_usd)}`
             }
-            tone={ai.limit_usd !== null && ai.spent_usd > ai.limit_usd + ai.purchased_usd ? "text-rose-700" : ""}
+            tone={ai.limit_usd !== null && ai.remaining_usd !== null && ai.remaining_usd <= 0 ? "text-rose-700" : ""}
           />
           <div className="mt-1 text-xs text-slate-500">
-            {ai.purchased_usd > 0 ? `Докуплено: ${usd(ai.purchased_usd)} · ` : ""}
+            {ai.purchased_usd > 0 ? `Докуплено, осталось: ${usd(ai.purchased_usd)} · ` : ""}
+            {ai.remaining_usd !== null ? `доступно сейчас: ${usd(ai.remaining_usd)} · ` : ""}
             израсходовано {tokens(ai.tokens_used)} токенов
           </div>
         </Card>
