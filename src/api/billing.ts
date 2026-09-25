@@ -65,6 +65,8 @@ export interface Subscription {
   ai_purchased_usd: number;
   tokens_used_period: number;
   last_error: string | null;
+  /** Отмена запланирована: доступ до current_period_end, в день продления — без счёта. */
+  cancel_at_period_end: boolean;
 }
 
 export interface InvoiceLine {
@@ -288,8 +290,8 @@ const TENANT_KEYS = ["tenant", "tenants"];
 
 export const usePlanAssign = () =>
   useInvokeMutation<
-    { tenant_id: string; mode: "assign" | "unbilled" | "cancel"; plan_id?: string; start_date?: string },
-    { subscription: Subscription; invoice?: Invoice; paid?: boolean }
+    { tenant_id: string; mode: "assign" | "unbilled" | "cancel" | "resume"; plan_id?: string; start_date?: string },
+    { subscription: Subscription; invoice?: Invoice; paid?: boolean; cancel_scheduled?: boolean; access_until?: string; voided_invoices?: string[] }
   >("billing_ops_plan_assign", { withRequestId: true, invalidate: TENANT_KEYS });
 
 export const usePaymentRecord = () =>
@@ -312,7 +314,15 @@ export const useInvoiceVoid = () =>
 
 export const useSubscriptionPatch = () =>
   useInvokeMutation<
-    { tenant_id: string; next_renewal_date?: string; grace_until?: string; current_period_start?: string; grace_started_on?: string },
+    {
+      tenant_id: string;
+      next_renewal_date?: string;
+      grace_until?: string;
+      current_period_start?: string;
+      grace_started_on?: string;
+      /** Дата продления внутри оплаченного периода: сервер без этого флага откажет. */
+      confirm_overlap?: boolean;
+    },
     { subscription: Subscription }
   >("billing_ops_subscription_patch", { withRequestId: true, invalidate: TENANT_KEYS });
 

@@ -81,6 +81,7 @@ export default function TenantPage() {
   const [voidInvoice, setVoidInvoice] = useState<Invoice | null>(null);
 
   const runTick = useRunTick();
+  const resume = usePlanAssign();
 
   if (isLoading) return <Loading />;
   if (error) return <ErrorBox error={error} />;
@@ -101,6 +102,27 @@ export default function TenantPage() {
         <Badge tone={status.tone} title={status.hint}>
           {status.label}
         </Badge>
+        {subscription.cancel_at_period_end ? (
+          <>
+            <Badge tone="amber" title="Отмена запланирована: новый счёт не выставится, после этого дня — только просмотр">
+              Не продлевается · доступ до {day(subscription.current_period_end)}
+            </Badge>
+            <Button
+              loading={resume.isPending}
+              onClick={() =>
+                resume.mutate(
+                  { tenant_id: company.id, mode: "resume" },
+                  {
+                    onSuccess: () => toast("ok", "Отмена снята: подписка продлится как обычно"),
+                    onError: (e) => toast("error", errorText(e)),
+                  }
+                )
+              }
+            >
+              Возобновить
+            </Button>
+          </>
+        ) : null}
         <div className="ml-auto flex flex-wrap gap-2">
           <Button onClick={() => setModal("payment")} variant="primary">
             <Banknote className="h-4 w-4" /> Отметить платёж
@@ -384,6 +406,11 @@ function PlanModal({ detail, plans, onClose }: { detail: TenantDetail; plans: { 
   const [mode, setMode] = useState<"assign" | "unbilled" | "cancel">("assign");
   const [planId, setPlanId] = useState(detail.subscription.plan_id ?? "");
   const [startDate, setStartDate] = useState(today());
+  // Идёт оплаченный период: отмена не отнимет его, а только не продлит.
+  const paidPeriodRuns =
+    detail.subscription.status === "active" &&
+    Boolean(detail.subscription.next_renewal_date) &&
+    (detail.subscription.next_renewal_date ?? "") > today();
 
   function submit() {
     assign.mutate(
@@ -392,7 +419,16 @@ function PlanModal({ detail, plans, onClose }: { detail: TenantDetail; plans: { 
         : { tenant_id: detail.company.id, mode },
       {
         onSuccess: (result) => {
-          toast("ok", result.invoice ? `Счёт ${result.invoice.number} выставлен` : "Подписка обновлена");
+          toast(
+            "ok",
+            result.cancel_scheduled
+              ? `Подписка не продлится: доступ до ${day(result.access_until)}, новый счёт не выставится`
+              : result.voided_invoices?.length
+                ? `Подписка отменена. Аннулированы счета: ${result.voided_invoices.join(", ")}`
+                : result.invoice
+                ? `Счёт ${result.invoice.number} выставлен`
+                : "Подписка обновлена"
+          );
           onClose();
         },
         onError: (e) => toast("error", errorText(e)),
@@ -418,7 +454,7 @@ function PlanModal({ detail, plans, onClose }: { detail: TenantDetail; plans: { 
         <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
           <option value="assign">Назначить план</option>
           <option value="unbilled">Снять с биллинга (полный доступ, счетов нет)</option>
-          <option value="cancel">Отменить подписку</option>
+          <option value="cancel">{paidPeriodRuns ? "Отменить подписку (не продлевать)" : "Отменить подписку"}</option>
         </Select>
       </Field>
 
@@ -447,7 +483,13 @@ function PlanModal({ detail, plans, onClose }: { detail: TenantDetail; plans: { 
         <p className="text-sm text-slate-500">
           {mode === "unbilled"
             ? "Компания получит полный доступ без счетов. Открытые счета будут аннулированы."
-            : "Подписка будет отменена: доступ только на просмотр, начисления прекратятся."}
+            : paidPeriodRuns
+              ? `Оплаченный период сохранится: полный доступ до ${day(detail.subscription.current_period_end)}, `
+                + "новый счёт не выставится, деньги не возвращаются. После этого дня — только просмотр. "
+                + "До этой даты отмену можно снять кнопкой «Возобновить»."
+              : "Оплаченного периода нет: подписка отменится сразу, доступ только на просмотр. Открытые счета "
+                + "аннулируются — долгом останется только минус на балансе (использованные дни отсрочки). "
+                + "Оплата после этого ляжет на баланс и компанию не включит: вернуть её можно, только назначив план."}
         </p>
       )}
     </Modal>
@@ -647,6 +689,11 @@ function DatesModal({ detail, onClose }: { detail: TenantDetail; onClose: () => 
   const [nextRenewal, setNextRenewal] = useState(subscription.next_renewal_date ?? "");
   const [periodStart, setPeriodStart] = useState(subscription.current_period_start ?? "");
   const [graceUntil, setGraceUntil] = useState(subscription.grace_until ?? "");
+  // Дата продления внутри оплаченного периода = второй счёт за оплаченные дни.
+  // Не запрещаем, но переспрашиваем: сервер без confirm_overlap тоже откажет.
+  const paidUntil = subscription.status === "active" ? subscription.current_period_end : null;
+  const overlaps = Boolean(nextRenewal && paidUntil && nextRenewal <= paidUntil);
+  const [confirmed, setConfirmed] = useState(false);
 
   return (
     <Modal
@@ -659,6 +706,7 @@ function DatesModal({ detail, onClose }: { detail: TenantDetail; onClose: () => 
           <Button
             variant="primary"
             loading={patch.isPending}
+            disabled={overlaps && !confirmed}
             onClick={() =>
               patch.mutate(
                 {
@@ -666,6 +714,7 @@ function DatesModal({ detail, onClose }: { detail: TenantDetail; onClose: () => 
                   next_renewal_date: nextRenewal || undefined,
                   current_period_start: periodStart || undefined,
                   grace_until: graceUntil || undefined,
+                  confirm_overlap: overlaps && confirmed ? true : undefined,
                 },
                 {
                   onSuccess: () => {
@@ -687,8 +736,27 @@ function DatesModal({ detail, onClose }: { detail: TenantDetail; onClose: () => 
         пишется в историю.
       </p>
       <Field label="Следующее списание">
-        <Input type="date" value={nextRenewal} onChange={(e) => setNextRenewal(e.target.value)} />
+        <Input
+          type="date"
+          value={nextRenewal}
+          onChange={(e) => {
+            setNextRenewal(e.target.value);
+            setConfirmed(false);
+          }}
+        />
       </Field>
+      {overlaps ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p>
+            Компания оплатила период до {day(paidUntil)}. Если поставить списание {day(nextRenewal)}, клиенту
+            выставится ещё один счёт за уже оплаченные дни.
+          </p>
+          <label className="mt-2 flex items-center gap-2">
+            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+            Понимаю, всё равно поставить эту дату
+          </label>
+        </div>
+      ) : null}
       <Field label="Начало текущего периода">
         <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
       </Field>
