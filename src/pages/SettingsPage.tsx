@@ -55,6 +55,9 @@ export default function SettingsPage() {
         ai_blended_usd_per_mtok: form.ai_blended_usd_per_mtok,
         ai_included_share: form.ai_included_share,
         ai_model_prices: prices,
+        topup_min_uzs: form.topup_min_uzs,
+        topup_max_uzs: form.topup_max_uzs,
+        fiscal: form.fiscal,
       },
       {
         onSuccess: () => toast("ok", "Настройки сохранены"),
@@ -132,6 +135,62 @@ export default function SettingsPage() {
           </div>
           <p className="mt-2 text-xs text-slate-400">
             По этим двум числам считается лимит токенов плана на странице «Планы и пакеты».
+          </p>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Пополнение картой">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Минимум, сум">
+              <NumberInput
+                integer
+                className="tnum"
+                value={form.topup_min_uzs}
+                onValueChange={(v) => setForm({ ...form, topup_min_uzs: v })}
+              />
+            </Field>
+            <Field label="Максимум, сум">
+              <NumberInput
+                integer
+                className="tnum"
+                value={form.topup_max_uzs}
+                onValueChange={(v) => setForm({ ...form, topup_max_uzs: v })}
+              />
+            </Field>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Сколько клиент может внести за один раз в HRMS → «Биллинг». Касса Payme общая с ucode; ключи задаются
+            переменными функции, не здесь.
+          </p>
+        </Card>
+
+        <Card title="Фискальный чек (ОФД)">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="ИКПУ" hint="17 цифр, tasnif.soliq.uz">
+              <Input
+                className="tnum"
+                value={form.fiscal.ikpu}
+                onChange={(e) => setForm({ ...form, fiscal: { ...form.fiscal, ikpu: e.target.value } })}
+              />
+            </Field>
+            <Field label="Код упаковки">
+              <Input
+                className="tnum"
+                value={form.fiscal.package_code}
+                onChange={(e) => setForm({ ...form, fiscal: { ...form.fiscal, package_code: e.target.value } })}
+              />
+            </Field>
+            <Field label="НДС, %">
+              <NumberInput
+                className="tnum"
+                value={form.fiscal.vat_percent ?? 0}
+                onValueChange={(v) => setForm({ ...form, fiscal: { ...form.fiscal, vat_percent: v } })}
+              />
+            </Field>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Коды берёт бухгалтер. Пока ИКПУ пуст, Payme пробивает чек со своими кодами по умолчанию.
           </p>
         </Card>
       </div>

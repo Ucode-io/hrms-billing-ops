@@ -149,14 +149,22 @@ export interface AiQuota {
 
 export interface CardPayment {
   guid: string;
+  /** topup — пополнение клиентом; прочее — от прежней схемы автосписания. */
+  kind: string;
+  request_id: string | null;
   invoice_id: string | null;
+  card_mask: string | null;
   attempt_key: string;
+  /** Номер заказа в кассе Payme (поле order_id) — по нему искать платёж в кабинете Payme. */
   order_id: number;
   amount_uzs: number;
+  /** Сколько Payme реально списал, если отличается от запрошенного. */
+  paid_amount_uzs: number | null;
   receipt_id: string | null;
   state: string;
   payme_state: number | null;
   error: string | null;
+  checked_at: string | null;
   created_at: string;
 }
 
@@ -203,6 +211,17 @@ export interface Settings {
   ai_blended_usd_per_mtok: number;
   ai_included_share: number;
   ai_model_prices: Record<string, Record<string, number>>;
+  /** Пределы разового пополнения картой клиентом, сум. */
+  topup_min_uzs: number;
+  topup_max_uzs: number;
+  /** Фискальные коды для чека Payme. Пусто — Payme ставит свои по умолчанию. */
+  fiscal: FiscalSettings;
+}
+
+export interface FiscalSettings {
+  ikpu: string;
+  package_code: string;
+  vat_percent: number | null;
 }
 
 export interface TickSummary {

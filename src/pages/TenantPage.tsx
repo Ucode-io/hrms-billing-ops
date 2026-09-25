@@ -42,11 +42,13 @@ function Stat({ label, value, tone = "" }: { label: string; value: React.ReactNo
   );
 }
 
+// Состояние попытки оплаты картой. «Ждёт Payme» — ответа не было (таймаут,
+// сбой сети): деньги могли списаться, сверка решит сама в ближайший тик.
 const CARD_STATE: Record<string, { label: string; tone: "green" | "amber" | "red" | "slate" }> = {
-  created: { label: "Отправлено в Payme", tone: "amber" },
-  paid: { label: "Списано", tone: "green" },
-  reconciled: { label: "Списано (сверено)", tone: "green" },
-  failed: { label: "Отказ", tone: "red" },
+  created: { label: "Ждёт Payme", tone: "amber" },
+  paid: { label: "Списано, зачисляется", tone: "amber" },
+  reconciled: { label: "Зачислено", tone: "green" },
+  failed: { label: "Не прошла", tone: "red" },
 };
 
 /**
@@ -219,7 +221,6 @@ export default function TenantPage() {
             <Stat label="Следующее списание" value={day(subscription.next_renewal_date)} />
             <Stat label="Отсрочка до" value={day(subscription.grace_until)} />
             <Stat label="Дней отсрочки списано" value={subscription.grace_days_charged} />
-            <Stat label="Автосписание" value={subscription.autopay_enabled ? "Включено" : "Выключено"} />
           </div>
           {subscription.last_error ? (
             <div className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{subscription.last_error}</div>
@@ -311,55 +312,45 @@ export default function TenantPage() {
         </Card>
       </div>
 
-      <Card title="Карты и автосписания">
-        {data.cards.length === 0 && data.card_payments.length === 0 ? (
+      <Card title="Оплаты картой (Payme)">
+        {data.card_payments.length === 0 ? (
           <p className="text-sm text-slate-400">
-            Карта не привязана. Компания платит переводом по счёту либо привяжет карту в своём кабинете.
+            Оплат картой не было. Клиент пополняет баланс картой сам на странице «Биллинг» в HRMS; деньги
+            сразу гасят открытые счета.
           </p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <div className="mb-2 text-xs uppercase tracking-wide text-slate-400">Карты</div>
-              <Table head={["Карта", "Срок", "Тип", "Статус"]} empty={data.cards.length === 0}>
-                {data.cards.map((card) => (
-                  <tr key={card.id}>
-                    <Td className="tnum text-slate-800">
-                      {card.pan_masked}
-                      {card.is_default ? <span className="ml-2 text-xs text-slate-400">основная</span> : null}
-                    </Td>
-                    <Td className="tnum text-slate-500">{card.expire}</Td>
-                    <Td className="text-slate-500">{card.card_type || "—"}</Td>
-                    <Td>
-                      <Badge tone={card.verified ? "green" : "amber"}>
-                        {card.verified ? "Подтверждена" : "Ждёт кода"}
-                      </Badge>
-                    </Td>
-                  </tr>
-                ))}
-              </Table>
-            </div>
-            <div>
-              <div className="mb-2 text-xs uppercase tracking-wide text-slate-400">Попытки списания</div>
-              <Table head={["Дата", "Сумма", "Результат"]} empty={data.card_payments.length === 0}>
-                {data.card_payments.map((payment) => (
-                  <tr key={payment.guid}>
-                    <Td className="whitespace-nowrap text-slate-500">{moment(payment.created_at)}</Td>
-                    <Td className="tnum">{uzs(payment.amount_uzs)}</Td>
-                    <Td>
-                      <Badge tone={CARD_STATE[payment.state]?.tone ?? "slate"}>
-                        {CARD_STATE[payment.state]?.label ?? payment.state}
-                      </Badge>
-                      {payment.error ? (
-                        <div className="mt-0.5 max-w-xs truncate text-xs text-rose-600" title={payment.error}>
-                          {payment.error}
-                        </div>
-                      ) : null}
-                    </Td>
-                  </tr>
-                ))}
-              </Table>
-            </div>
-          </div>
+          <Table head={["Дата", "Сумма", "Карта", "Результат", "Заказ / чек Payme"]} empty={false}>
+            {data.card_payments.map((payment) => (
+              <tr key={payment.guid}>
+                <Td className="whitespace-nowrap text-slate-500">{moment(payment.created_at)}</Td>
+                <Td className="tnum">
+                  {uzs(payment.amount_uzs)}
+                  {payment.paid_amount_uzs != null && payment.paid_amount_uzs !== payment.amount_uzs ? (
+                    <div className="text-xs text-rose-600">списано {uzs(payment.paid_amount_uzs)}</div>
+                  ) : null}
+                </Td>
+                <Td className="tnum text-slate-500">{payment.card_mask || "—"}</Td>
+                <Td>
+                  <Badge tone={CARD_STATE[payment.state]?.tone ?? "slate"}>
+                    {CARD_STATE[payment.state]?.label ?? payment.state}
+                  </Badge>
+                  {payment.error ? (
+                    <div className="mt-0.5 max-w-xs truncate text-xs text-rose-600" title={payment.error}>
+                      {payment.error}
+                    </div>
+                  ) : null}
+                </Td>
+                <Td className="tnum text-xs text-slate-500">
+                  <div>№ {payment.order_id}</div>
+                  {payment.receipt_id ? (
+                    <div className="max-w-[12rem] truncate" title={payment.receipt_id}>
+                      {payment.receipt_id}
+                    </div>
+                  ) : null}
+                </Td>
+              </tr>
+            ))}
+          </Table>
         )}
       </Card>
 

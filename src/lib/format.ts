@@ -43,7 +43,7 @@ export const STATUS: Record<string, { label: string; tone: Tone; hint: string }>
 
 export const TX_TYPE: Record<string, string> = {
   topup_bank: "Банковский перевод",
-  topup_card: "Оплата картой",
+  topup_card: "Пополнение картой",
   charge_plan: "Списание за план",
   charge_overage: "Доплата за места",
   charge_grace_day: "День отсрочки",
@@ -71,6 +71,9 @@ export const EVENT: Record<string, string> = {
   card_removed: "Карта удалена",
   autopay_changed: "Автосписание переключено",
   canceled: "Подписка отменена",
+  cancel_scheduled: "Отмена запланирована (до конца периода)",
+  cancel_revoked: "Отмена снята",
+  card_topup: "Пополнение картой",
   set_unbilled: "Снята с биллинга",
   subscription_patched: "Правка дат",
   ai_tokens_granted: "Начислены токены",
