@@ -321,6 +321,26 @@ export const usePlanAssign = () =>
     { subscription: Subscription; invoice?: Invoice; paid?: boolean; cancel_scheduled?: boolean; access_until?: string; voided_invoices?: string[] }
   >("billing_ops_plan_assign", { withRequestId: true, invalidate: TENANT_KEYS });
 
+/** Окно «Новая компания»: компания + её первый админ одним вызовом. Пароль сервер не возвращает. */
+export type CompanyCreateInput = {
+  name: string;
+  admin: { first_name: string; second_name?: string; login: string; password: string };
+};
+
+export type CompanyCreateResult = {
+  company: { id: string; name: string };
+  admin: { user_base_id: string | null; login: string; first_name?: string; second_name?: string };
+  hrms_url: string;
+  /** Этот же запрос уже создал компанию раньше — вторая не создавалась. */
+  duplicate?: boolean;
+};
+
+export const useCompanyCreate = () =>
+  useInvokeMutation<CompanyCreateInput, CompanyCreateResult>("billing_ops_company_create", {
+    withRequestId: true,
+    invalidate: ["tenants"],
+  });
+
 export const usePaymentRecord = () =>
   useInvokeMutation<
     { tenant_id: string; amount_uzs: number; invoice_id?: string; reference?: string; comment?: string },

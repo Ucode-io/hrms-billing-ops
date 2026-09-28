@@ -55,6 +55,7 @@ export const TX_TYPE: Record<string, string> = {
 };
 
 export const EVENT: Record<string, string> = {
+  company_created: "Компания создана",
   plan_assigned: "Назначен план",
   plan_changed: "План изменён",
   renewed: "Продление оплачено",

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Play, Search } from "lucide-react";
+import { Play, Plus, Search } from "lucide-react";
 import { useRunTick, useTenants } from "../api/billing";
 import type { TenantRow } from "../api/billing";
 import { Badge, Button, Card, ErrorBox, Input, Loading, Select, Table, Td, errorText, useToast } from "../components/ui";
 import { STATUS, day, uzs } from "../lib/format";
+import CreateCompanyModal from "./CreateCompanyModal";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Все статусы" },
@@ -56,6 +57,7 @@ function Totals({ rows }: { rows: TenantRow[] }) {
 export default function TenantsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [creating, setCreating] = useState(false);
   const toast = useToast();
 
   const { data, isLoading, error } = useTenants({
@@ -87,6 +89,9 @@ export default function TenantsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-lg font-semibold text-slate-900">Компании</h1>
+        <Button variant="primary" onClick={() => setCreating(true)} title="Завести компанию в HRMS и её администратора">
+          <Plus className="h-4 w-4" /> Новая компания
+        </Button>
         <Button onClick={onRunTick} loading={runTick.isPending} title="Пересчитать подписки и списания прямо сейчас">
           <Play className="h-4 w-4" /> Пересчитать сейчас
         </Button>
@@ -164,6 +169,8 @@ export default function TenantsPage() {
           </Table>
         )}
       </Card>
+
+      {creating && <CreateCompanyModal onClose={() => setCreating(false)} />}
     </div>
   );
 }
