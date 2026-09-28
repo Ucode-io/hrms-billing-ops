@@ -1,6 +1,8 @@
 import { auth } from "../store/auth";
 
-const BASE_URL = "https://api.admin.u-code.io";
+// Для локальной проверки против песочницы биллинга (`yarn sandbox` в функции):
+// VITE_BILLING_BASE_URL=http://localhost:5199 yarn dev.
+const BASE_URL = import.meta.env.VITE_BILLING_BASE_URL || "https://api.admin.u-code.io";
 const PROJECT_ID = "9a462573-ce11-4288-928a-a6ba754b6998";
 const FUNCTION_PATH = "udevs-hrms-billing";
 

@@ -374,6 +374,27 @@ export const usePackSave = () =>
     invalidate: ["packs"],
   });
 
+/**
+ * Порядок каталога после перетаскивания. Новый порядок ставим в кэш сразу,
+ * чтобы строка не прыгала назад, пока идёт запрос; ошибка — откат к серверу.
+ */
+export const useCatalogReorder = (kind: "plan" | "pack") => {
+  const client = useQueryClient();
+  const key = kind === "plan" ? "plans" : "packs";
+  return useMutation({
+    mutationFn: (ids: string[]) => invoke("billing_ops_catalog_reorder", { kind, ids }),
+    onMutate: (ids: string[]) => {
+      client.setQueryData<Record<string, { id: string }[]>>([key], (old) => {
+        const rows = old?.[key];
+        if (!rows) return old;
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        return { ...old, [key]: ids.map((id) => byId.get(id)).filter((row) => row !== undefined) };
+      });
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: [key] }),
+  });
+};
+
 export const useSettingsSave = () =>
   useInvokeMutation<Partial<Settings>, Settings>("billing_ops_settings_save", { invalidate: ["settings"] });
 

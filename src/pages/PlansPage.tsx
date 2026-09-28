@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Calculator, Pencil, Plus, Trash2 } from "lucide-react";
+import { Calculator, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import {
+  useCatalogReorder,
   usePackDelete,
   usePackSave,
   usePacks,
@@ -13,9 +14,11 @@ import {
 import type { Pack, Plan } from "../api/billing";
 import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Modal, NumberInput, Select, Table, Td, errorText, useToast } from "../components/ui";
 import { tokens, usd } from "../lib/format";
+import { useRowDrag } from "../lib/useRowDrag";
 
+// Кода и порядка в форме нет (решение 25.09): код сервер собирает из названия,
+// порядок меняется перетаскиванием строк, новый план встаёт первым.
 const EMPTY_PLAN: Partial<Plan> = {
-  code: "",
   title: "",
   price_usd: 0,
   included_seats: 0,
@@ -23,10 +26,21 @@ const EMPTY_PLAN: Partial<Plan> = {
   included_ai_usd: 0,
   ai_enabled: true,
   is_active: true,
-  sort_order: 0,
 };
 
-const EMPTY_PACK: Partial<Pack> = { code: "", title: "", grants_usd: 5, price_usd: 0, is_active: true, sort_order: 0 };
+const EMPTY_PACK: Partial<Pack> = { title: "", grants_usd: 5, price_usd: 0, is_active: true };
+
+/** Полоска-подсказка, куда встанет перетаскиваемая строка. */
+const dropLine = (side: "before" | "after" | null) =>
+  side === "before" ? "shadow-[inset_0_2px_0_0_#0f172a]" : side === "after" ? "shadow-[inset_0_-2px_0_0_#0f172a]" : "";
+
+function GripCell() {
+  return (
+    <Td className="w-6 cursor-grab text-slate-300 active:cursor-grabbing" title="Перетащите, чтобы поменять порядок">
+      <GripVertical className="h-4 w-4" />
+    </Td>
+  );
+}
 
 export default function PlansPage() {
   const plans = usePlans();
@@ -37,6 +51,18 @@ export default function PlansPage() {
 
   const [planDraft, setPlanDraft] = useState<Partial<Plan> | null>(null);
   const [packDraft, setPackDraft] = useState<Partial<Pack> | null>(null);
+
+  const reorderPlans = useCatalogReorder("plan");
+  const reorderPacks = useCatalogReorder("pack");
+  const onReorderError = { onError: (e: unknown) => toast("error", errorText(e)) };
+  const planDrag = useRowDrag(
+    (plans.data ?? []).map((plan) => plan.id),
+    (ids) => reorderPlans.mutate(ids, onReorderError)
+  );
+  const packDrag = useRowDrag(
+    (packs.data ?? []).map((pack) => pack.id),
+    (ids) => reorderPacks.mutate(ids, onReorderError)
+  );
 
   return (
     <div className="space-y-4">
@@ -77,18 +103,19 @@ export default function PlansPage() {
           <Loading />
         ) : (
           <Table
-            head={["Название", "Код", "Цена", "Мест", "Сверх лимита", "AI в месяц", "Компаний", "Статус", ""]}
+            head={["", "Название", "Цена", "Мест", "Сверх лимита", "AI в месяц", "Компаний", "Видят клиенты", ""]}
             empty={(plans.data ?? []).length === 0}
           >
             {(plans.data ?? []).map((plan) => (
               <tr
                 key={plan.id}
-                onClick={() => setPlanDraft(plan)}
-                className="cursor-pointer hover:bg-slate-50"
-                title="Открыть для изменения"
+                {...planDrag.rowProps(plan.id)}
+                onClick={() => !planDrag.wasDragged() && setPlanDraft(plan)}
+                className={`cursor-pointer hover:bg-slate-50 ${planDrag.dragId === plan.id ? "opacity-40" : ""} ${dropLine(planDrag.dropSide(plan.id))}`}
+                title="Нажмите, чтобы изменить; перетащите, чтобы поменять порядок"
               >
+                <GripCell />
                 <Td className="font-medium text-slate-900">{plan.title}</Td>
-                <Td className="text-slate-400">{plan.code}</Td>
                 <Td className="tnum">{usd(plan.price_usd)}</Td>
                 <Td className="tnum text-slate-600">{plan.included_seats}</Td>
                 <Td className="tnum text-slate-600">{usd(plan.overage_price_usd)} / место</Td>
@@ -104,7 +131,7 @@ export default function PlansPage() {
                 </Td>
                 <Td className="tnum text-slate-600">{plan.subscriptions ?? 0}</Td>
                 <Td>
-                  <Badge tone={plan.is_active ? "green" : "slate"}>{plan.is_active ? "В каталоге" : "Скрыт"}</Badge>
+                  <Badge tone={plan.is_active ? "green" : "slate"}>{plan.is_active ? "Да" : "Только оператор"}</Badge>
                 </Td>
                 <Td>
                   <span className="inline-flex items-center gap-1 text-xs text-slate-500">
@@ -116,9 +143,10 @@ export default function PlansPage() {
           </Table>
         )}
         <p className="mt-3 text-xs text-slate-400">
-          Нажмите на строку, чтобы изменить план. Новая цена действует со следующего счёта: выставленные счета хранят
-          свой снимок цен. Удалить можно только план, которым ещё никто не пользовался; если компании на нём уже есть,
-          снимите «в каталоге» — он исчезнет из выбора, а действующие подписки не изменятся.
+          Нажмите на строку, чтобы изменить план; перетащите за ручку слева, чтобы поменять порядок в этом списке.
+          Клиенты видят планы по цене, от дешёвого к дорогому. Новая цена действует со следующего счёта: выставленные
+          счета хранят свой снимок цен. Удалить можно только план, которым ещё никто не пользовался; если компании на нём
+          уже есть, поставьте «Видят клиенты: нет» — выбрать его сможет только оператор, действующие подписки не изменятся.
         </p>
       </Card>
 
@@ -134,20 +162,21 @@ export default function PlansPage() {
         {packs.isLoading ? (
           <Loading />
         ) : (
-          <Table head={["Название", "Код", "Даёт AI на", "Цена", "Статус", ""]} empty={(packs.data ?? []).length === 0}>
+          <Table head={["", "Название", "Даёт AI на", "Цена", "В продаже", ""]} empty={(packs.data ?? []).length === 0}>
             {(packs.data ?? []).map((pack) => (
               <tr
                 key={pack.id}
-                onClick={() => setPackDraft(pack)}
-                className="cursor-pointer hover:bg-slate-50"
-                title="Открыть для изменения"
+                {...packDrag.rowProps(pack.id)}
+                onClick={() => !packDrag.wasDragged() && setPackDraft(pack)}
+                className={`cursor-pointer hover:bg-slate-50 ${packDrag.dragId === pack.id ? "opacity-40" : ""} ${dropLine(packDrag.dropSide(pack.id))}`}
+                title="Нажмите, чтобы изменить; перетащите, чтобы поменять порядок"
               >
+                <GripCell />
                 <Td className="font-medium text-slate-900">{pack.title}</Td>
-                <Td className="text-slate-400">{pack.code}</Td>
                 <Td className="tnum text-slate-600">{usd(pack.grants_usd)}</Td>
                 <Td className="tnum">{usd(pack.price_usd)}</Td>
                 <Td>
-                  <Badge tone={pack.is_active ? "green" : "slate"}>{pack.is_active ? "В каталоге" : "Скрыт"}</Badge>
+                  <Badge tone={pack.is_active ? "green" : "slate"}>{pack.is_active ? "Да" : "Не продаётся"}</Badge>
                 </Td>
                 <Td>
                   <span className="inline-flex items-center gap-1 text-xs text-slate-500">
@@ -228,7 +257,7 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
           <Button
             variant="primary"
             loading={save.isPending}
-            disabled={!form.code?.trim() || !form.title?.trim()}
+            disabled={!form.title?.trim()}
             onClick={() =>
               save.mutate(
                 { plan: form },
@@ -248,12 +277,11 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
       }
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Название">
-          <Input value={form.title ?? ""} onChange={(e) => patch({ title: e.target.value })} />
-        </Field>
-        <Field label="Код" hint="Латиница, цифры, дефис. Используется в API и в истории.">
-          <Input value={form.code ?? ""} onChange={(e) => patch({ code: e.target.value })} disabled={Boolean(draft.id)} />
-        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Название">
+            <Input value={form.title ?? ""} onChange={(e) => patch({ title: e.target.value })} />
+          </Field>
+        </div>
         <Field label="Цена в месяц, $">
           <NumberInput
             className="tnum"
@@ -302,19 +330,14 @@ function PlanModal({ draft, onClose }: { draft: Partial<Plan>; onClose: () => vo
             <option value="off">Выключен на этом плане</option>
           </Select>
         </Field>
-        <Field label="В каталоге">
+        <Field
+          label="Видят клиенты"
+          hint="Закрытый план назначает только оператор; компания на нём сама план не меняет. Действующие подписки флаг не трогает."
+        >
           <Select value={form.is_active === false ? "off" : "on"} onChange={(e) => patch({ is_active: e.target.value === "on" })}>
-            <option value="on">Показывать</option>
-            <option value="off">Скрыть (действующие подписки не меняются)</option>
+            <option value="on">Да — клиенты могут выбрать</option>
+            <option value="off">Нет — назначает только оператор</option>
           </Select>
-        </Field>
-        <Field label="Порядок в списке">
-          <NumberInput
-            integer
-            className="tnum"
-            value={form.sort_order}
-            onValueChange={(v) => patch({ sort_order: v })}
-          />
         </Field>
       </div>
     </Modal>
@@ -368,7 +391,7 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
           <Button
             variant="primary"
             loading={save.isPending}
-            disabled={!form.code?.trim() || !form.title?.trim() || !form.grants_usd}
+            disabled={!form.title?.trim() || !form.grants_usd}
             onClick={() =>
               save.mutate(
                 { pack: form },
@@ -388,12 +411,11 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
       }
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Название">
-          <Input value={form.title ?? ""} onChange={(e) => patch({ title: e.target.value })} />
-        </Field>
-        <Field label="Код">
-          <Input value={form.code ?? ""} onChange={(e) => patch({ code: e.target.value })} disabled={Boolean(draft.id)} />
-        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Название">
+            <Input value={form.title ?? ""} onChange={(e) => patch({ title: e.target.value })} />
+          </Field>
+        </div>
         <Field label="Даёт AI на, $" hint="Сколько долларов лимита получит компания.">
           <NumberInput
             className="tnum"
@@ -408,19 +430,11 @@ function PackModal({ draft, onClose }: { draft: Partial<Pack>; onClose: () => vo
             onValueChange={(v) => patch({ price_usd: v })}
           />
         </Field>
-        <Field label="В каталоге">
+        <Field label="В продаже" hint="Снятый с продажи пакет не купить; купленный остаток у компаний сохраняется.">
           <Select value={form.is_active === false ? "off" : "on"} onChange={(e) => patch({ is_active: e.target.value === "on" })}>
-            <option value="on">Показывать</option>
-            <option value="off">Скрыть</option>
+            <option value="on">Да</option>
+            <option value="off">Нет — не продаётся</option>
           </Select>
-        </Field>
-        <Field label="Порядок в списке">
-          <NumberInput
-            integer
-            className="tnum"
-            value={form.sort_order}
-            onValueChange={(v) => patch({ sort_order: v })}
-          />
         </Field>
       </div>
       <p className="text-xs text-slate-400">

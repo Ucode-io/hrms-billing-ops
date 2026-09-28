@@ -454,13 +454,13 @@ function PlanModal({ detail, plans, onClose }: { detail: TenantDetail; plans: { 
           <Field label="План">
             <Select value={planId} onChange={(e) => setPlanId(e.target.value)}>
               <option value="">— выберите —</option>
-              {plans
-                .filter((plan) => plan.is_active || plan.id === detail.subscription.plan_id)
-                .map((plan) => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.title} — {usd(plan.price_usd)} / {plan.included_seats} мест
-                  </option>
-                ))}
+              {/* Оператор назначает любой план, закрытый тоже: так живут индивидуальные условия. */}
+              {plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.title} — {usd(plan.price_usd)} / {plan.included_seats} мест
+                  {plan.is_active ? "" : " · только оператор"}
+                </option>
+              ))}
             </Select>
           </Field>
           <Field
