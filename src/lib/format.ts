@@ -68,6 +68,7 @@ export const EVENT: Record<string, string> = {
   plan_downgrade_scheduled: "Запланирован даунгрейд",
   invoice_voided: "Счёт аннулирован",
   card_bound: "Привязана карта",
+  card_saved: "Сохранена карта",
   card_removed: "Карта удалена",
   autopay_changed: "Автосписание переключено",
   canceled: "Подписка отменена",

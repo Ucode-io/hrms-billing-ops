@@ -116,13 +116,17 @@ export interface Transaction {
   created_at: string;
 }
 
+/** Сохранённая карта компании (одна). Оператор её только видит: платит и удаляет клиент. */
 export interface CardRow {
   id: string;
   pan_masked: string;
+  /** ММ/ГГ */
   expire: string;
+  expired: boolean;
   card_type: string;
-  verified: boolean;
-  is_default: boolean;
+  added_by: { id: string; name: string } | null;
+  created_at: string;
+  autopay_consent: boolean;
 }
 
 export interface EventRow {
@@ -154,6 +158,10 @@ export interface CardPayment {
   request_id: string | null;
   invoice_id: string | null;
   card_mask: string | null;
+  /** Оплачено сохранённой картой, если card_id есть, а save_result пуст. */
+  card_id: string | null;
+  /** Клиент просил запомнить карту: pending | saved | not_recurrent | failed; null — не просил. */
+  save_result: string | null;
   attempt_key: string;
   /** Номер заказа в кассе Payme (поле order_id) — по нему искать платёж в кабинете Payme. */
   order_id: number;

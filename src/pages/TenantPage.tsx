@@ -12,7 +12,7 @@ import {
   useSubscriptionPatch,
   useTenant,
 } from "../api/billing";
-import type { Invoice, TenantDetail } from "../api/billing";
+import type { CardRow, Invoice, TenantDetail } from "../api/billing";
 import {
   Badge,
   Button,
@@ -50,6 +50,34 @@ const CARD_STATE: Record<string, { label: string; tone: "green" | "amber" | "red
   reconciled: { label: "Зачислено", tone: "green" },
   failed: { label: "Не прошла", tone: "red" },
 };
+
+// Клиент просил запомнить карту этой оплатой — чем кончилось.
+const CARD_SAVE: Record<string, string> = {
+  pending: "запомнить — ждёт исхода оплаты",
+  saved: "карта сохранена",
+  not_recurrent: "сохранить нельзя (Payme)",
+  failed: "не сохранена",
+};
+
+/** Карта компании: оператор только видит — платит ею и удаляет её клиент. */
+function SavedCard({ card }: { card: CardRow | undefined }) {
+  if (!card) return <p className="mb-3 text-sm text-slate-500">Сохранённой карты нет.</p>;
+  return (
+    <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+      <span className="text-slate-500">Сохранённая карта:</span>
+      <span className="tnum font-medium text-slate-900">
+        {card.card_type} {card.pan_masked}
+      </span>
+      <span className={`tnum ${card.expired ? "text-rose-700" : "text-slate-500"}`}>
+        до {card.expire}
+        {card.expired ? " · срок истёк" : ""}
+      </span>
+      <span className="text-xs text-slate-400">
+        добавил {card.added_by?.name || "—"}, {moment(card.created_at)}
+      </span>
+    </div>
+  );
+}
 
 /**
  * Сколько ещё нужно внести по каждому открытому счёту. Из счёта дебетуется всё,
@@ -313,6 +341,7 @@ export default function TenantPage() {
       </div>
 
       <Card title="Оплаты картой (Payme)">
+        <SavedCard card={data.cards[0]} />
         {data.card_payments.length === 0 ? (
           <p className="text-sm text-slate-400">
             Оплат картой не было. Клиент пополняет баланс картой сам на странице «Биллинг» в HRMS; деньги
@@ -329,7 +358,15 @@ export default function TenantPage() {
                     <div className="text-xs text-rose-600">списано {uzs(payment.paid_amount_uzs)}</div>
                   ) : null}
                 </Td>
-                <Td className="tnum text-slate-500">{payment.card_mask || "—"}</Td>
+                <Td className="tnum text-slate-500">
+                  {payment.card_mask || "—"}
+                  {payment.card_id && !payment.save_result ? (
+                    <div className="text-xs text-slate-400">сохранённой картой</div>
+                  ) : null}
+                  {payment.save_result ? (
+                    <div className="text-xs text-slate-400">{CARD_SAVE[payment.save_result] ?? payment.save_result}</div>
+                  ) : null}
+                </Td>
                 <Td>
                   <Badge tone={CARD_STATE[payment.state]?.tone ?? "slate"}>
                     {CARD_STATE[payment.state]?.label ?? payment.state}
